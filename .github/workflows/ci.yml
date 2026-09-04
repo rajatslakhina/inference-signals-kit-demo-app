@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: iOS Simulator · resolve remote package + build
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show available schemes
+        run: xcodebuild -list -project Demo.xcodeproj
+
+      # This is the load-bearing step. It proves the version-pinned
+      # `XCRemoteSwiftPackageReference` genuinely resolves from GitHub — not
+      # from a local path, not from a checkout that happens to sit next door.
+      - name: Resolve Swift package dependencies
+        run: xcodebuild -resolvePackageDependencies -project Demo.xcodeproj -scheme Demo
+
+      - name: Show resolved version
+        run: cat Demo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+
+      # `generic/platform=iOS Simulator` deliberately, never a named device such
+      # as `name=iPhone 16`: that ties the job to whichever simulator runtimes
+      # are installed on the day's runner image, and a compile check needs no
+      # device to exist. Signing is disabled because a simulator build does not
+      # need it and this repo has no team to sign with.
+      - name: Build for iOS Simulator
+        run: |
+          xcodebuild build \
+            -project Demo.xcodeproj \
+            -scheme Demo \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
